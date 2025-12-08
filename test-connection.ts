@@ -7,15 +7,16 @@ import 'dotenv/config';
 
 async function testConnection() {
     const baseUrl = process.env.DOCBOX_BASE_URL || 'https://api.docbox.eu';
-    const port = process.env.DOCBOX_PORT || '8081';
     const apiKey = process.env.DOCBOX_API_KEY;
+    const cloudId = process.env.DOCBOX_CLOUD_ID;
 
     console.log('🔍 Testing Docbox API Connection');
     console.log('================================');
     console.log(`Base URL: ${baseUrl}`);
-    console.log(`Port: ${port}`);
-    console.log(`Full API URL: ${baseUrl}:${port}/api/v2`);
     console.log(`API Key: ${apiKey?.substring(0, 8)}...`);
+    if (cloudId) {
+        console.log(`Cloud ID: ${cloudId}`);
+    }
     console.log('');
 
     if (!apiKey) {
@@ -23,17 +24,23 @@ async function testConnection() {
         process.exit(1);
     }
 
-    const testUrl = `${baseUrl}:${port}/api/v2/archivestructure`;
+    const testUrl = `${baseUrl}/api/v2/archivestructure`;
     console.log(`🌐 Testing connection to: ${testUrl}`);
     console.log('');
 
     try {
+        const headers: Record<string, string> = {
+            'API-Key': apiKey,
+            'Accept': 'application/json'
+        };
+
+        if (cloudId) {
+            headers['Cloud-ID'] = cloudId;
+        }
+
         const response = await fetch(testUrl, {
             method: 'GET',
-            headers: {
-                'API-Key': apiKey,
-                'Accept': 'application/json'
-            }
+            headers
         });
 
         console.log(`✅ Response Status: ${response.status} ${response.statusText}`);

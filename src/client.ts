@@ -12,6 +12,7 @@ import {
     InboxListResponse
 } from './types';
 import FormData from 'form-data';
+import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
 
 /**
  * Main Docbox API Client
@@ -19,9 +20,9 @@ import FormData from 'form-data';
  * @example
  * ```typescript
  * const docbox = new DocboxClient({
- *   baseUrl: 'https://api.docbox.eu',
+ *   baseUrl: 'https://cloud.docbox.eu:8081',
  *   apiKey: 'your-api-key',
- *   cloudId: 'your-cloud-id' // optional, for cloud version
+ *   cloudId: 'your-cloud-id' // required for cloud version
  * });
  * 
  * // Get archive structure
@@ -41,47 +42,49 @@ import FormData from 'form-data';
 export class DocboxClient {
     private config: DocboxConfig;
     private baseApiUrl: string;
+    private axiosInstance: AxiosInstance;
 
     constructor(config: DocboxConfig) {
-        this.config = {
-            ...config
-        };
+        this.config = { ...config };
 
         // Construct base API URL
-        const baseUrl = this.config.baseUrl.replace(/\/$/, ''); // Remove trailing slash
+        const baseUrl = this.config.baseUrl.replace(/\/$/, '');
 
-        // For cloud.docbox.eu, don't add port (uses default HTTPS 443)
-        // For self-hosted, add port if specified
-        if (baseUrl.includes('cloud.docbox.eu')) {
+        // Check if port is already in the base URL (e.g., https://cloud.docbox.eu:8081)
+        const hasPort = baseUrl.match(/:\d+$/);
+
+        if (hasPort) {
             this.baseApiUrl = `${baseUrl}/api/v2`;
+        } else if (this.config.port) {
+            this.baseApiUrl = `${baseUrl}:${this.config.port}/api/v2`;
         } else {
-            const port = this.config.port || 8081;
-            this.baseApiUrl = `${baseUrl}:${port}/api/v2`;
+            this.baseApiUrl = `${baseUrl}/api/v2`;
         }
+
+        // Create axios instance
+        this.axiosInstance = axios.create({
+            baseURL: this.baseApiUrl,
+            timeout: 30000,
+            headers: this.getHeaders()
+        });
     }
 
     /**
      * Get the authorization headers for API requests
      */
-    private getHeaders(includeContentType = true): Record<string, string> {
+    private getHeaders(): Record<string, string> {
         const headers: Record<string, string> = {
             'API-Key': this.config.apiKey,
+            'Accept': 'application/json'
         };
-
-        console.log('[DEBUG] this.config.cloudId:', this.config.cloudId);
 
         if (this.config.cloudId) {
             headers['Cloud-ID'] = this.config.cloudId;
-            console.log('[DEBUG] Cloud-ID header added:', this.config.cloudId);
         }
 
         if (this.config.username && this.config.password) {
             const auth = Buffer.from(`${this.config.username}:${this.config.password}`).toString('base64');
             headers['Authorization'] = `Basic ${auth}`;
-        }
-
-        if (includeContentType) {
-            headers['Accept'] = 'application/json';
         }
 
         return headers;
@@ -95,80 +98,36 @@ export class DocboxClient {
         endpoint: string,
         options?: {
             params?: Record<string, any>;
-            body?: any;
+            data?: any;
             headers?: Record<string, string>;
         }
     ): Promise<T> {
-        const url = new URL(`${this.baseApiUrl}${endpoint}`);
-
-        console.log('[DEBUG] Requesting URL:', url.toString());
-
-        // Add query parameters
-        if (options?.params) {
-            Object.entries(options.params).forEach(([key, value]) => {
-                if (value !== undefined && value !== null) {
-                    url.searchParams.append(key, String(value));
-                }
-            });
-        }
-
-        const headers = {
-            ...this.getHeaders(),
-            ...options?.headers
-        };
-
-        console.log('[DEBUG] Request headers:', JSON.stringify(headers, null, 2));
-
-        const fetchOptions: RequestInit = {
-            method,
-            headers,
-        };
-
-        if (options?.body) {
-            if (options.body instanceof FormData) {
-                // Let fetch set the content-type for FormData (it needs to include boundary)
-                delete headers['Accept'];
-                fetchOptions.body = options.body as any;
-            } else {
-                fetchOptions.body = JSON.stringify(options.body);
-                headers['Content-Type'] = 'application/json';
-            }
-        }
-
         try {
-            const response = await fetch(url.toString(), fetchOptions);
+            const config: AxiosRequestConfig = {
+                method,
+                url: endpoint,
+                params: options?.params,
+                data: options?.data,
+                headers: {
+                    ...this.getHeaders(),
+                    ...options?.headers
+                }
+            };
 
-            if (!response.ok) {
-                const errorBody = await response.text();
+            const response = await this.axiosInstance.request<T>(config);
+            return response.data;
+        } catch (error) {
+            if (axios.isAxiosError(error)) {
                 throw new DocboxError(
-                    `API request failed: ${response.statusText}`,
-                    response.status,
-                    errorBody
+                    error.response?.data?.message || error.message,
+                    error.response?.status,
+                    error.response?.data
                 );
             }
-
-            // Check if response has content
-            const contentLength = response.headers.get('content-length');
-            if (contentLength === '0' || response.status === 204) {
-                return {} as T;
-            }
-
-            const contentType = response.headers.get('content-type');
-            if (contentType?.includes('application/json')) {
-                return (await response.json()) as T;
-            }
-
-            return (await response.text()) as any as T;
-        } catch (error) {
-            if (error instanceof DocboxError) {
-                throw error;
-            }
-            // Log the actual error for debugging
-            console.error('[DEBUG] Fetch error details:', error);
             throw new DocboxError(
-                `Network error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                error instanceof Error ? error.message : 'Unknown error',
                 undefined,
-                error instanceof Error ? error.stack : undefined
+                error
             );
         }
     }
@@ -227,7 +186,7 @@ export class DocboxClient {
         }
 
         if (options.excludedMetadataKeys) {
-            params['excluded-matadata-keys'] = options.excludedMetadataKeys;
+            params['excluded-metadata-keys'] = options.excludedMetadataKeys;
         }
 
         if (options.withAutoexportStatus !== undefined) {
@@ -314,7 +273,7 @@ export class DocboxClient {
         }
 
         return this.request<FileUploadResponse>('POST', '/file-upload', {
-            body: formData,
+            data: formData,
             headers: formData.getHeaders()
         });
     }
@@ -341,19 +300,19 @@ export class DocboxClient {
      * ```
      */
     async createFolder(options: FolderCreateOptions): Promise<FolderCreateResponse> {
-        const body: Record<string, any> = {
+        const data: Record<string, any> = {
             name: options.name
         };
 
         if (options.parentFolderId) {
-            body.parentFolderId = options.parentFolderId;
+            data.parentFolderId = options.parentFolderId;
         }
 
         if (options.parentFolderPath) {
-            body.parentFolderPath = options.parentFolderPath;
+            data.parentFolderPath = options.parentFolderPath;
         }
 
-        return this.request<FolderCreateResponse>('POST', '/folder/create', { body });
+        return this.request<FolderCreateResponse>('POST', '/folder/create', { data });
     }
 
     /**
