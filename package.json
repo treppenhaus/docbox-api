@@ -1,0 +1,31 @@
+{
+    "name": "@treppenhaus/docbox-api",
+    "version": "1.0.0",
+    "description": "Simple, clean, modern API client for Docbox",
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "scripts": {
+        "build": "tsc",
+        "dev": "tsc --watch",
+        "test": "echo \"Error: no test specified\" && exit 1",
+        "prepare": "npm run build"
+    },
+    "keywords": [
+        "docbox",
+        "api",
+        "client",
+        "document",
+        "archive"
+    ],
+    "author": "treppenhaus",
+    "license": "MIT",
+    "devDependencies": {
+        "@types/node": "^20.10.0",
+        "dotenv": "^17.2.3",
+        "tsx": "^4.21.0",
+        "typescript": "^5.3.3"
+    },
+    "dependencies": {
+        "form-data": "^4.0.0"
+    }
+}
