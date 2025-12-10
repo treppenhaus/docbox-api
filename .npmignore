@@ -1,0 +1,25 @@
+# Source files (we only publish dist)
+src/
+tsconfig.json
+
+# Examples and tests
+examples/
+
+# Environment and config
+.env
+.env.*
+
+# Git
+.git
+.gitignore
+
+# Development files
+*.log
+npm-debug.log*
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
