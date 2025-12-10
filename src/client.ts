@@ -9,7 +9,9 @@ import {
     FileUploadResponse,
     FolderCreateOptions,
     FolderCreateResponse,
-    InboxListResponse
+    InboxListResponse,
+    SearchOptions,
+    SearchResponse
 } from './types';
 import FormData from 'form-data';
 import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
@@ -61,12 +63,34 @@ export class DocboxClient {
             this.baseApiUrl = `${baseUrl}/api/v2`;
         }
 
-        // Create axios instance
-        this.axiosInstance = axios.create({
+        // Create axios instance with proxy support
+        const axiosConfig: AxiosRequestConfig = {
             baseURL: this.baseApiUrl,
             timeout: 30000,
             headers: this.getHeaders()
-        });
+        };
+
+        // Configure proxy if provided
+        if (this.config.proxyHost) {
+            const proxyProtocol = this.config.proxyProtocol || 'http';
+            const proxyPort = this.config.proxyPort || 8080;
+
+            axiosConfig.proxy = {
+                protocol: proxyProtocol,
+                host: this.config.proxyHost,
+                port: proxyPort
+            };
+
+            // Add proxy authentication if provided
+            if (this.config.proxyAuth) {
+                axiosConfig.proxy.auth = {
+                    username: this.config.proxyAuth.username,
+                    password: this.config.proxyAuth.password
+                };
+            }
+        }
+
+        this.axiosInstance = axios.create(axiosConfig);
     }
 
     /**
@@ -328,5 +352,140 @@ export class DocboxClient {
      */
     async listInboxes(): Promise<InboxListResponse> {
         return this.request<InboxListResponse>('GET', '/inboxes');
+    }
+
+    /**
+     * Search for documents
+     * 
+     * @param options - Search options
+     * @returns Search results
+     * 
+     * @example
+     * ```typescript
+     * // Search by document name
+     * const results = await docbox.search({
+     *   documentNameTerms: 'urlaubsantrag',
+     *   paginationSize: 20
+     * });
+     * 
+     * // Full-text search
+     * const results = await docbox.search({
+     *   fulltextAll: 'invoice payment',
+     *   fromDate: '2024-01-01'
+     * });
+     * 
+     * // Search in specific folder
+     * const results = await docbox.search({
+     *   locationFolderId: 123,
+     *   recursive: true
+     * });
+     * ```
+     */
+    async search(options: SearchOptions = {}): Promise<SearchResponse> {
+        const params: Record<string, any> = {};
+
+        if (options.paginationSize !== undefined) {
+            params['pagination-size'] = options.paginationSize;
+        }
+
+        if (options.paginationPage !== undefined) {
+            params['pagination-page'] = options.paginationPage;
+        }
+
+        if (options.fulltextAll) {
+            params['fulltext-all'] = options.fulltextAll;
+        }
+
+        if (options.fulltextOne) {
+            params['fulltext-one'] = options.fulltextOne;
+        }
+
+        if (options.fulltextNone) {
+            params['fulltext-none'] = options.fulltextNone;
+        }
+
+        if (options.fromDate) {
+            const date = options.fromDate instanceof Date
+                ? options.fromDate.toISOString().split('T')[0]
+                : options.fromDate;
+            params['from-date'] = date;
+        }
+
+        if (options.toDate) {
+            const date = options.toDate instanceof Date
+                ? options.toDate.toISOString().split('T')[0]
+                : options.toDate;
+            params['to-date'] = date;
+        }
+
+        if (options.followupTerms) {
+            params['followup-terms'] = options.followupTerms;
+        }
+
+        if (options.noteTerms) {
+            params['note-terms'] = options.noteTerms;
+        }
+
+        if (options.keywordTerms) {
+            params['keyword-terms'] = options.keywordTerms;
+        }
+
+        if (options.stampsInclusive) {
+            params['stamps-inclusive'] = options.stampsInclusive;
+        }
+
+        if (options.stampsExclusive) {
+            params['stamps-exclusive'] = options.stampsExclusive;
+        }
+
+        if (options.documentNameTerms) {
+            params['document-name-terms'] = options.documentNameTerms;
+        }
+
+        if (options.folderNameTerms) {
+            params['folder-name-terms'] = options.folderNameTerms;
+        }
+
+        if (options.location) {
+            params['location'] = options.location;
+        }
+
+        if (options.locationFolderId !== undefined) {
+            params['location-folder-id'] = options.locationFolderId;
+        }
+
+        if (options.recursive !== undefined) {
+            params['recursive'] = options.recursive;
+        }
+
+        if (options.archiverId !== undefined) {
+            params['archiver-id'] = options.archiverId;
+        }
+
+        if (options.workflowName) {
+            params['workflow-name'] = options.workflowName;
+        }
+
+        if (options.workflowState) {
+            params['workflow-state'] = options.workflowState;
+        }
+
+        if (options.documentType) {
+            params['document-type'] = options.documentType;
+        }
+
+        if (options.includeTrash !== undefined) {
+            params['include-trash'] = options.includeTrash;
+        }
+
+        if (options.externalId) {
+            params['external-id'] = options.externalId;
+        }
+
+        if (options.externalMetadata) {
+            params['external-metadata'] = options.externalMetadata;
+        }
+
+        return this.request<SearchResponse>('POST', '/search', { params });
     }
 }

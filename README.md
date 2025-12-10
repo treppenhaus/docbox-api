@@ -8,6 +8,7 @@ A simple, clean, modern TypeScript client for the [Docbox](https://docbox.eu) AP
 🔒 **Type-Safe** - Full TypeScript support with comprehensive types
 📦 **Lightweight** - Minimal dependencies
 🚀 **Modern** - Uses async/await and ES2020+
+🌐 **Proxy Support** - Works behind corporate firewalls with HTTP/HTTPS proxy support
 📖 **Well Documented** - JSDoc comments and examples
 
 ## Installation
@@ -74,7 +75,51 @@ interface DocboxConfig {
   
   /** API port (default: 8081) */
   port?: number;
+  
+  /** Proxy host (e.g., '10.0.0.1' or 'proxy.company.com') */
+  proxyHost?: string;
+  
+  /** Proxy port (e.g., 8080, 3128) */
+  proxyPort?: number;
+  
+  /** Proxy protocol (default: 'http') */
+  proxyProtocol?: 'http' | 'https';
+  
+  /** Proxy authentication credentials */
+  proxyAuth?: {
+    username: string;
+    password: string;
+  };
 }
+```
+
+### Using a Proxy
+
+If you're behind a corporate firewall or need to route requests through a proxy:
+
+```typescript
+// Simple proxy without authentication
+const docbox = new DocboxClient({
+  baseUrl: 'https://api.docbox.eu',
+  apiKey: 'your-api-key',
+  cloudId: 'your-cloud-id',
+  proxyHost: '10.0.0.1',
+  proxyPort: 8080,
+  proxyProtocol: 'http'
+});
+
+// Proxy with authentication
+const docbox = new DocboxClient({
+  baseUrl: 'https://api.docbox.eu',
+  apiKey: 'your-api-key',
+  cloudId: 'your-cloud-id',
+  proxyHost: 'proxy.company.com',
+  proxyPort: 3128,
+  proxyAuth: {
+    username: 'proxyuser',
+    password: 'proxypass'
+  }
+});
 ```
 
 ## API Methods
